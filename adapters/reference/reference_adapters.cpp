@@ -10,6 +10,10 @@ using namespace tftp_test_harness::net;
 
 EngineConfig make_engine_config(ReferencePersonality personality) {
     EngineConfig config;
+    // Loopback RTT is microseconds, so a fast retransmission timeout keeps the
+    // adversarial sweeps bounded while remaining far above the real round trip.
+    config.retransmission_timeout = std::chrono::milliseconds(400);
+    config.maximum_retransmissions = 8;
     switch (personality) {
         case ReferencePersonality::Correct:
             break; // all defaults are correct behavior

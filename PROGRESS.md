@@ -57,28 +57,48 @@ tests/          harness self-tests
 ## Phases & status
 
 - [x] **Phase 0 — repo scaffold**: dirs, seed files relocated to `docs/` + `include/`, git init.
-- [ ] **Phase 1 — Scaffold**: CMake, socket shim, UDP socket, endpoint, TFTP packet
-  codec + unit tests, seeded PRNG, UDP checksum helper. Loopback transfer through a
-  zero-impairment proxy.
-- [ ] **Phase 2 — Reference engine + adapters**: correct engine, buggy engine,
-  reference client/server adapters, subprocess base, system-tftp example.
-- [ ] **Phase 3 — Impairment proxy**: each stage + per-stage unit tests.
-- [ ] **Phase 4 — Observer / oracle**: packet-level conformance checks + content oracle.
-- [ ] **Phase 5 — Test suite A–H + fixtures + runner**: every matrix ID; SKIP vs FAIL.
-- [ ] **Phase 6 — Resilience sweeps**: F-series intensity sweeps + checkpointing.
-- [ ] **Phase 7 — Metrics + report**: metrics store, HTML report, comparison mode.
-- [ ] **Phase 8 — Self-verification + polish**: buggy-vs-correct proof; final cleanup.
+- [x] **Phase 1 — Scaffold**: CMake, socket shim, UDP socket, endpoint, TFTP packet
+  codec + unit tests, seeded SplitMix64 PRNG. Loopback transfer through a
+  zero-impairment proxy confirmed.
+- [x] **Phase 2 — Reference engine + adapters**: full correct engine (RFC
+  1350/2347/2348/2349/7440), buggy engine via named `EngineQuirks`, reference
+  client/server adapters, subprocess client base, system-tftp example.
+- [x] **Phase 3 — Impairment proxy**: pipeline (loss/GE-loss/dup/reorder/delay/
+  corrupt/throttle/blackout) with per-stage unit tests; select() event-loop proxy with
+  TID emulation, scheduled sends, injection, full trace.
+- [x] **Phase 4 — Observer / oracle**: packet-level conformance observer + vendored
+  SHA-256 content oracle. Proven to flag the buggy engine and clear the correct one.
+- [x] **Phase 5 — Test suite A–H + fixtures + runner**: deterministic fixtures,
+  self-describing registry for every matrix ID, transfer driver with watchdog +
+  isolation, runner with capability resolution (SKIP vs FAIL).
+- [x] **Phase 6 — Resilience sweeps**: F-series intensity sweeps; metrics streamed
+  incrementally (crash-resilient checkpointing).
+- [x] **Phase 7 — Metrics + report**: self-contained JSON metrics store, analysis
+  model (six axes), single-file HTML report with inline SVG, comparison mode.
+- [x] **Phase 8 — Self-verification + polish**: `test_self_verification` asserts the
+  buggy engine is flagged on its exact defects and the correct one passes.
 
-## Current focus
+## Results (self-verification)
 
-Phase 1 — networking core and packet codec.
+- **Correct** reference: 73/73 records pass, 0 integrity violations, 0 hangs.
+- **Buggy** reference: flagged on the final-block rule (A-04/A-05), Sorcerer's
+  Apprentice (A-32/A-33), and out-of-sequence acceptance (reordering) — while clean
+  transfers unaffected by its defects pass.
 
-## Open design questions
+## Notes / design decisions
 
 - Windows path: the socket shim compiles for Winsock2 but is only exercised on POSIX in
-  this environment. Kept behind `#ifdef _WIN32`; not runtime-tested on Windows.
-- IP-level UDP checksum recomputation for the corruption stage: we recompute the UDP
-  checksum over the *payload we deliver* so the datagram stays deliverable; since we use
-  connected UDP on loopback the kernel owns the real checksum, so "checksum-passing
-  corruption" is modeled at the TFTP payload layer (the bytes the peer parses), which is
-  what the conformance test actually cares about. Documented in `impairments`.
+  this environment. Kept behind `#ifdef _WIN32`; not runtime-tested on Windows. The
+  subprocess launcher is POSIX-only (returns launch_failed on Windows); the in-process
+  reference adapters work everywhere.
+- Corruption stage models mutation at the TFTP payload layer (the bytes the peer
+  parses): on loopback the kernel owns the real UDP checksum, so this is exactly the
+  "checksum-passing corruption" F-06 is about. F-06 targets the opcode field (which an
+  implementation parses and can reject); corrupting the opaque DATA payload is inherently
+  undetectable by base TFTP and would unfairly fail every implementation, so it is not a
+  pass/fail gate.
+- Impairment/injection fixtures are deliberately non-exact-multiples of 512 so the
+  buggy final-block defect stays isolated to A-04/A-05 and does not confound the other
+  tests' attribution.
+- Reference retransmission timeout is 400 ms (loopback RTT is microseconds); keeps the
+  adversarial sweeps bounded while remaining far above the real round trip.
