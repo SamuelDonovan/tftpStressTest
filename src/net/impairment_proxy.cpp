@@ -313,9 +313,28 @@ void ImpairmentProxy::relay_loop() {
 
         for (auto& stray : stray_sockets_) {
             if (FD_ISSET(stray->native_handle(), &read_set)) {
-                // Drain and discard (e.g. an ERROR 5 reply to an injected
-                // stray-TID datagram); the reply itself is not relayed.
-                stray->receive_from(buffer, sender);
+                // An inbound datagram on a stray socket is the victim's reply to
+                // an injected stray-TID packet — typically ERROR code 5 (unknown
+                // transfer ID). It is not relayed, but it IS recorded so the
+                // observer can confirm the peer rebuffed the stray TID rather
+                // than aborting the legitimate transfer (A-21/A-22/G-06).
+                const long received = stray->receive_from(buffer, sender);
+                if (received > 0) {
+                    TraceRecord record;
+                    record.direction = Direction::ClientToServer;
+                    record.source_tid = sender.port();
+                    record.destination_tid = stray->local_endpoint().port();
+                    record.datagram_length = buffer.size();
+                    auto parsed = parse_tftp_packet(buffer);
+                    record.parseable = parsed.ok;
+                    if (parsed.ok) {
+                        record.packet = parsed.packet;
+                    }
+                    record.disposition = TraceDisposition::Injected;
+                    record.note = "reply to stray TID (dropped by proxy)";
+                    std::lock_guard<std::mutex> lock(trace_mutex_);
+                    trace_.records.push_back(record);
+                }
             }
         }
     }
