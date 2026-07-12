@@ -11,8 +11,10 @@
 #include "reference/reference_adapters.hpp"
 #include "runner/runner.hpp"
 #include "tftpclient/tftpclient_adapter.hpp"
+#include "tftpd64/tftpd64_client_adapter.hpp"
 #include "tftpd64/tftpd64_server_adapter.hpp"
 
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -30,13 +32,16 @@ reference::ReferencePersonality parse_personality(const std::string& name) {
 
 void print_usage() {
     std::cout
-        << "Usage: tftp_runner [--impl correct|buggy|base-only|tftpd64|tftpclient]\n"
+        << "Usage: tftp_runner [--impl correct|buggy|base-only|tftpd64|\n                    tftpclient|tftpd64-client]\n"
         << "                   [--out PATH] [--seed N] [--filter SUBSTR] [--huge]\n"
+        << "                   [--watchdog MS]\n"
         << "\n"
         << "  tftpd64 runs the real Win32 server under Wine and needs\n"
         << "  TFTPD64_WINE, TFTPD64_EXE and TFTPD64_WINEPREFIX in the "
            "environment.\n"
-        << "  tftpclient runs an external CLI client and needs TFTPCLIENT_BIN.\n";
+        << "  tftpclient runs an external CLI client and needs TFTPCLIENT_BIN.\n"
+        << "  tftpd64-client drives Tftpd64's GUI client and additionally needs\n"
+        << "  TFTPD64_PYTHON and TFTPD64_DRIVER.\n";
 }
 
 } // namespace
@@ -64,6 +69,9 @@ int main(int argc, char** argv) {
                 static_cast<std::uint64_t>(std::stoull(next("--seed")));
         } else if (arg == "--filter") {
             options.id_filter = next("--filter");
+        } else if (arg == "--watchdog") {
+            options.watchdog =
+                std::chrono::milliseconds(std::stoi(next("--watchdog")));
         } else if (arg == "--huge") {
             options.include_huge_fixtures = true;
         } else if (arg == "--help" || arg == "-h") {
@@ -82,7 +90,8 @@ int main(int argc, char** argv) {
     //   tftpd64    — the real Win32 server, driven through Wine.
     //   tftpclient — an external CLI client, driven as a subprocess.
     const bool external_server = (impl == "tftpd64");
-    const bool external_client = (impl == "tftpclient");
+    const bool external_client =
+        (impl == "tftpclient" || impl == "tftpd64-client");
     const auto personality = (external_server || external_client)
                                  ? reference::ReferencePersonality::Correct
                                  : parse_personality(impl);
@@ -92,21 +101,28 @@ int main(int argc, char** argv) {
 
     std::unique_ptr<tftpd64::Tftpd64ServerAdapter> tftpd64_server;
     std::unique_ptr<TftpClientAdapter> tftpclient;
+    std::unique_ptr<tftpd64::Tftpd64ClientAdapter> tftpd64_client;
     try {
         if (external_server) {
             tftpd64_server = std::make_unique<tftpd64::Tftpd64ServerAdapter>(
                 tftpd64::Tftpd64Config::from_environment());
-        } else if (external_client) {
+        } else if (impl == "tftpclient") {
             tftpclient = std::make_unique<TftpClientAdapter>(
                 TftpClientAdapter::from_environment());
+        } else if (impl == "tftpd64-client") {
+            tftpd64_client = std::make_unique<tftpd64::Tftpd64ClientAdapter>(
+                tftpd64::Tftpd64ClientConfig::from_environment());
         }
     } catch (const std::exception& error) {
         std::cerr << error.what() << "\n";
         return 2;
     }
 
+    ClientAdapter* client_under_test =
+        tftpclient ? static_cast<ClientAdapter*>(tftpclient.get())
+                   : static_cast<ClientAdapter*>(tftpd64_client.get());
     ClientAdapter& client = external_client
-                                ? static_cast<ClientAdapter&>(*tftpclient)
+                                ? *client_under_test
                                 : static_cast<ClientAdapter&>(reference_client);
     ServerAdapter& server = external_server
                                 ? static_cast<ServerAdapter&>(*tftpd64_server)

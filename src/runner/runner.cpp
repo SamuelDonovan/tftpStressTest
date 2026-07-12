@@ -62,6 +62,7 @@ RunSummary run_suite(ClientAdapter& client, ServerAdapter& server,
     context.server = &server;
     context.work_root = work_root / "tests";
     context.base_seed = options.base_seed;
+    context.watchdog = options.watchdog;
     context.implementation_name = implementation;
     context.fixtures = build_fixture_map(work_root / "fixtures",
                                          options.include_huge_fixtures);
