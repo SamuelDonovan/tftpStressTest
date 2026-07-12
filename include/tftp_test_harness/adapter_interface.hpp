@@ -64,6 +64,17 @@ struct TransferResult {
     std::optional<int> process_exit_code;               // subprocess adapters
     std::chrono::milliseconds wall_clock_duration{0};
     RequestedOptions options_confirmed_in_use;          // best effort, if known
+
+    // Set this when the implementation cannot express the requested transfer at
+    // all -- not when it tried and failed. supports_capability() answers per
+    // capability ("does it do blksize?"), but some implementations support a
+    // capability only at particular values: Tftpd64's GUI client, for example,
+    // offers blksize from a fixed dropdown, so blksize=1428 is not a defect it
+    // can fail, it is a request it cannot make. Such a transfer is recorded as
+    // SKIPPED (unsupported), never FAILED -- the same rule supports_capability
+    // applies, at per-request granularity. Explain the limitation in
+    // reported_error_message; it appears in the report.
+    bool unsupported_configuration{false};
 };
 
 // Client downloads FROM the server (Read Request, RFC 1350 opcode 1).

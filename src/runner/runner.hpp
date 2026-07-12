@@ -14,6 +14,7 @@
 #include "runner/test_case.hpp"
 #include "tftp_test_harness/adapter_interface.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -27,6 +28,9 @@ struct RunnerOptions {
     std::uint64_t base_seed = 0xC0FFEE1234ULL;
     std::filesystem::path work_root; // defaults to a temp dir if empty
     bool include_huge_fixtures = false;
+    // Per-transfer hang bound; raise it for an implementation whose legitimate
+    // give-up is slower than the default (see TestContext::watchdog).
+    std::chrono::milliseconds watchdog{20000};
     // Optional substring filter: only run tests whose ID contains this string.
     std::string id_filter;
     // Progress callback (id, index, total, outcome-summary). Optional.

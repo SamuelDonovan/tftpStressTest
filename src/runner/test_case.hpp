@@ -17,6 +17,8 @@
 #include "metrics/metrics_store.hpp"
 #include "tftp_test_harness/adapter_interface.hpp"
 
+#include <chrono>
+
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -34,6 +36,13 @@ struct TestContext {
     std::filesystem::path work_root;                   // per-run temp root
     std::uint64_t base_seed = 0;
     std::string implementation_name;
+
+    // Per-transfer hang bound. It must exceed the longest give-up an
+    // implementation can legitimately take, or a correct-but-slow abort is
+    // misreported as a hang: Tftpd64's GUI client, for instance, retries 6 times
+    // at a hardcoded 3 s and terminates cleanly at ~21 s, which the default 20 s
+    // would flag as an infinite loop.
+    std::chrono::milliseconds watchdog{20000};
 
     // A fresh per-test work directory (isolation).
     std::filesystem::path work_dir_for(const std::string& test_id) const {

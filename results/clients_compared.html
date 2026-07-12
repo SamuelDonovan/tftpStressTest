@@ -1,0 +1,79 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TFTP comparison — tftpClient / reference-correct-server vs Tftpd64 GUI client (Wine) / reference-correct-server</title><style>
+:root{
+  --surface:#f4f4f1; --card:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8a85;
+  --series:#2a78d6; --good:#008300; --warn:#b07400; --bad:#d13a39;
+  --border:#e0e0da; --grid:#ececE6; --axis:#b8b8b1;
+  --good-bg:#e7f3e7; --warn-bg:#faf1dd; --bad-bg:#fbe7e7;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --surface:#141413; --card:#1f1f1d; --ink:#f4f4f0; --ink2:#c3c2b7; --muted:#8f8e86;
+    --series:#3987e5; --good:#4fae4f; --warn:#e0a52a; --bad:#e66767;
+    --border:#33332f; --grid:#2a2a27; --axis:#4a4a45;
+    --good-bg:#16241a; --warn-bg:#2a2416; --bad-bg:#2c1a1a;
+  }
+}
+:root[data-theme=light]{
+  --surface:#f4f4f1; --card:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8a85;
+  --series:#2a78d6; --good:#008300; --warn:#b07400; --bad:#d13a39;
+  --border:#e0e0da; --grid:#ececE6; --axis:#b8b8b1;
+  --good-bg:#e7f3e7; --warn-bg:#faf1dd; --bad-bg:#fbe7e7;
+}
+:root[data-theme=dark]{
+  --surface:#141413; --card:#1f1f1d; --ink:#f4f4f0; --ink2:#c3c2b7; --muted:#8f8e86;
+  --series:#3987e5; --good:#4fae4f; --warn:#e0a52a; --bad:#e66767;
+  --border:#33332f; --grid:#2a2a27; --axis:#4a4a45;
+  --good-bg:#16241a; --warn-bg:#2a2416; --bad-bg:#2c1a1a;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--surface);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.5;}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px;}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-0.01em;}
+h2{font-size:19px;margin:40px 0 14px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+h3{font-size:15px;margin:24px 0 8px;color:var(--ink2);}
+.sub{color:var(--ink2);font-size:14px;margin:0 0 4px;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin-top:20px;}
+.tile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.tile .label{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);}
+.tile .value{font-size:30px;font-weight:650;margin-top:6px;letter-spacing:-0.02em;}
+.tile .value.small{font-size:20px;}
+.tile .foot{font-size:12px;color:var(--ink2);margin-top:4px;}
+.value.good{color:var(--good);} .value.warn{color:var(--warn);} .value.bad{color:var(--bad);}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.03em;}
+.tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:12px;}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;}
+.badge.pass{background:var(--good-bg);color:var(--good);}
+.badge.fail{background:var(--bad-bg);color:var(--bad);}
+.badge.skip{background:var(--grid);color:var(--muted);}
+.callout{border-radius:12px;padding:14px 18px;margin-top:16px;font-size:14px;}
+.callout.bad{background:var(--bad-bg);border:1px solid var(--bad);}
+.callout.good{background:var(--good-bg);border:1px solid var(--good);}
+.callout ul{margin:8px 0 0;padding-left:20px;}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px;}
+.chartcard{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px 8px;}
+.chartcard .ct{font-size:14px;font-weight:600;margin-bottom:2px;}
+.chartcard .cs{font-size:12px;color:var(--muted);margin-bottom:6px;}
+svg{max-width:100%;height:auto;display:block;}
+.svg-grid{stroke:var(--grid);stroke-width:1;}
+.svg-axis{stroke:var(--axis);stroke-width:1;}
+.svg-line{stroke:var(--series);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round;}
+.svg-dot{fill:var(--series);}
+.svg-text{fill:var(--ink2);font-size:10px;font-family:inherit;}
+.svg-area{fill:var(--series);opacity:0.10;}
+.caprow{display:flex;align-items:center;gap:8px;}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+.dot.yes{background:var(--good);} .dot.no{background:var(--muted);}
+.narrative{color:var(--ink2);}
+.foot-note{margin-top:40px;color:var(--muted);font-size:12px;}
+code{background:var(--grid);padding:1px 5px;border-radius:5px;font-size:12.5px;}
+</style></head><body><div class="wrap"><h1>TFTP Implementation Comparison</h1><p class="sub"><strong>A:</strong> tftpClient / reference-correct-server<br><strong>B:</strong> Tftpd64 GUI client (Wine) / reference-correct-server</p><div class="callout good"><strong>Verdict.</strong> tftpClient / reference-correct-server has fewer MUST-level (CRITICAL) conformance failures.</div><h2>Scoring axes</h2><div class="tablewrap"><table><thead><tr><th>Axis</th><th>A</th><th>B</th><th>Advantage</th><th>Note</th></tr></thead><tbody><tr><td>Conformance score</td><td>100.0</td><td>100.0</td><td><span class="badge skip">tie</span></td><td class="sub">weighted over A-E, G</td></tr><tr><td>MUST-level (CRITICAL) failures</td><td>0</td><td>1</td><td><span class="badge pass">A</span></td><td class="sub">fewer is better</td></tr><tr><td>Resilience index</td><td>0.871</td><td>0.605</td><td><span class="badge pass">A</span></td><td class="sub">mean area under F curves</td></tr><tr><td>Integrity violations</td><td>0</td><td>0</td><td><span class="badge skip">tie</span></td><td class="sub">silent corruption; fewer is better</td></tr><tr><td>Graceful degradation</td><td>100%</td><td>0%</td><td><span class="badge pass">A</span></td><td class="sub">clean failures vs hangs</td></tr><tr><td>Avg throughput (B/s)</td><td>24080</td><td>6409</td><td><span class="badge pass">A</span></td><td class="sub">passing transfers</td></tr></tbody></table></div><h2>Divergences (per test ID and RFC clause)</h2><p class="sub">9 test(s) where the two implementations diverged, each traced to its RFC clause.</p><div class="tablewrap"><table><thead><tr><th>Test</th><th>Condition</th><th>A</th><th>B</th><th>RFC</th><th>Explanation</th></tr></thead><tbody><tr><td class="mono">B-04</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 2347 section 2</td><td class="narrative">unsupported by this implementation: driver: blksize 700 is not offered by the client (fixed dropdown)
+</td></tr><tr><td class="mono">C-02</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 2348</td><td class="narrative">unsupported by this implementation: driver: blksize 8 is not offered by the client (fixed dropdown)
+</td></tr><tr><td class="mono">C-03</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 2348</td><td class="narrative">unsupported by this implementation: driver: blksize 1428 is not offered by the client (fixed dropdown)
+</td></tr><tr><td class="mono">C-04</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 2348</td><td class="narrative">unsupported by this implementation: driver: blksize 65464 is not offered by the client (fixed dropdown)
+</td></tr><tr><td class="mono">C-07</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 2348; UDP/IP fragmentation</td><td class="narrative">unsupported by this implementation: driver: blksize 9000 is not offered by the client (fixed dropdown)
+</td></tr><tr><td class="mono">D-01</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 2349 section 2</td><td class="narrative">capability &#39;rfc2349_timeout&#39; not supported by the implementation under test</td></tr><tr><td class="mono">E-01</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 7440 section 2</td><td class="narrative">capability &#39;rfc7440_windowsize&#39; not supported by the implementation under test</td></tr><tr><td class="mono">E-02</td><td></td><td><span class="badge pass">PASS</span></td><td><span class="badge skip">SKIPPED</span></td><td class="sub">RFC 7440 section 2</td><td class="narrative">capability &#39;rfc7440_windowsize&#39; not supported by the implementation under test</td></tr><tr><td class="mono">F-08</td><td>F-08=1</td><td><span class="badge pass">PASS</span></td><td><span class="badge fail">FAIL</span></td><td class="sub">compound-failure resilience</td><td class="narrative">hung under impairment (no clean termination)</td></tr></tbody></table></div><p class="foot-note">Both implementations were run independently through the identical suite. Every divergence above is attributed to a stable test ID and the RFC clause it derives from.</p></div></body></html>

@@ -4,6 +4,7 @@
 #include "runner/transfer_driver.hpp"
 #include "verify/packet_observer.hpp"
 
+#include <algorithm>
 #include <memory>
 
 namespace tftp_test_harness::runner {
@@ -80,6 +81,7 @@ DriveRequest make_request(const TestContext& context, const TestCase& test,
     request.work_root =
         context.work_dir_for(test.id) / std::to_string(seed_index);
     request.effective_block_size = 512;
+    request.watchdog = context.watchdog;
     return request;
 }
 
@@ -101,6 +103,18 @@ std::vector<MetricRecord> single(MetricRecord record) {
 // Judge a transfer expected to complete byte-exact.
 void judge_byte_exact(MetricRecord& record, const DriveResult& result) {
     fill_counters(record, result);
+    // The implementation cannot express this request (see
+    // TransferResult::unsupported_configuration). Unsupported is never a
+    // failure.
+    if (result.app_result.unsupported_configuration) {
+        record.outcome = Outcome::Skipped;
+        record.narrative =
+            "unsupported by this implementation: " +
+            (result.app_result.reported_error_message.empty()
+                 ? std::string("the requested transfer cannot be configured")
+                 : result.app_result.reported_error_message);
+        return;
+    }
     if (result.setup_failed) {
         record.outcome = Outcome::Fail;
         record.ungraceful_failure = true;
@@ -516,7 +530,8 @@ std::vector<MetricRecord> resilience_sweep(
                                     TransferDirection::Download, index);
         request.impairment = point.second;
         request.options = options;
-        request.watchdog = std::chrono::milliseconds(45000);
+        request.watchdog = std::max(context.watchdog,
+                                    std::chrono::milliseconds(45000));
         MetricRecord record = base_record(test, context);
         record.seed = request.seed;
         record.intensity = point.first;
@@ -577,7 +592,8 @@ std::vector<MetricRecord> integrity_under_corruption(
         auto request = make_request(context, test, fixture_key,
                                     TransferDirection::Download, index);
         request.impairment = point.second;
-        request.watchdog = std::chrono::milliseconds(25000);
+        request.watchdog = std::max(context.watchdog,
+                                    std::chrono::milliseconds(25000));
         MetricRecord record = base_record(test, context);
         record.seed = request.seed;
         record.intensity = point.first;
@@ -783,7 +799,8 @@ std::vector<TestCase> build_test_registry() {
             auto request = make_request(c, t, "kib_8",
                                         TransferDirection::Download);
             request.impairment = blackout;
-            request.watchdog = std::chrono::milliseconds(20000);
+            request.watchdog = std::max(c.watchdog,
+                                        std::chrono::milliseconds(20000));
             MetricRecord record = base_record(t, c);
             record.seed = request.seed;
             DriveResult result = drive_transfer(request);
@@ -985,7 +1002,8 @@ std::vector<TestCase> build_test_registry() {
             auto request =
                 make_request(c, t, "kib_8", TransferDirection::Download);
             request.impairment = config;
-            request.watchdog = std::chrono::milliseconds(20000);
+            request.watchdog = std::max(c.watchdog,
+                                        std::chrono::milliseconds(20000));
             MetricRecord record = base_record(t, c);
             record.seed = request.seed;
             DriveResult result = drive_transfer(request);
