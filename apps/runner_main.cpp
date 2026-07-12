@@ -10,6 +10,7 @@
 
 #include "reference/reference_adapters.hpp"
 #include "runner/runner.hpp"
+#include "tftpclient/tftpclient_adapter.hpp"
 #include "tftpd64/tftpd64_server_adapter.hpp"
 
 #include <iostream>
@@ -29,12 +30,13 @@ reference::ReferencePersonality parse_personality(const std::string& name) {
 
 void print_usage() {
     std::cout
-        << "Usage: tftp_runner [--impl correct|buggy|base-only|tftpd64]\n"
+        << "Usage: tftp_runner [--impl correct|buggy|base-only|tftpd64|tftpclient]\n"
         << "                   [--out PATH] [--seed N] [--filter SUBSTR] [--huge]\n"
         << "\n"
         << "  tftpd64 runs the real Win32 server under Wine and needs\n"
         << "  TFTPD64_WINE, TFTPD64_EXE and TFTPD64_WINEPREFIX in the "
-           "environment.\n";
+           "environment.\n"
+        << "  tftpclient runs an external CLI client and needs TFTPCLIENT_BIN.\n";
 }
 
 } // namespace
@@ -74,28 +76,38 @@ int main(int argc, char** argv) {
         }
     }
 
-    // "tftpd64" swaps in the real Win32 server (driven through Wine) as the
-    // server under test, while the verified-correct reference engine plays the
-    // client, so every divergence is attributable to tftpd64.
+    // Exactly one side is ever the implementation under test; the other is the
+    // verified-correct reference engine, so every divergence is attributable to
+    // the implementation being evaluated.
+    //   tftpd64    — the real Win32 server, driven through Wine.
+    //   tftpclient — an external CLI client, driven as a subprocess.
     const bool external_server = (impl == "tftpd64");
-    const auto personality = external_server
+    const bool external_client = (impl == "tftpclient");
+    const auto personality = (external_server || external_client)
                                  ? reference::ReferencePersonality::Correct
                                  : parse_personality(impl);
 
-    reference::ReferenceClientAdapter client(personality);
+    reference::ReferenceClientAdapter reference_client(personality);
     reference::ReferenceServerAdapter reference_server(personality);
 
     std::unique_ptr<tftpd64::Tftpd64ServerAdapter> tftpd64_server;
-    if (external_server) {
-        try {
+    std::unique_ptr<TftpClientAdapter> tftpclient;
+    try {
+        if (external_server) {
             tftpd64_server = std::make_unique<tftpd64::Tftpd64ServerAdapter>(
                 tftpd64::Tftpd64Config::from_environment());
-        } catch (const std::exception& error) {
-            std::cerr << error.what() << "\n";
-            return 2;
+        } else if (external_client) {
+            tftpclient = std::make_unique<TftpClientAdapter>(
+                TftpClientAdapter::from_environment());
         }
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << "\n";
+        return 2;
     }
 
+    ClientAdapter& client = external_client
+                                ? static_cast<ClientAdapter&>(*tftpclient)
+                                : static_cast<ClientAdapter&>(reference_client);
     ServerAdapter& server = external_server
                                 ? static_cast<ServerAdapter&>(*tftpd64_server)
                                 : static_cast<ServerAdapter&>(reference_server);
